@@ -12,3 +12,19 @@ export function getServerSupabase(): SupabaseClient<Database> | null {
     },
   });
 }
+
+export function getServerSupabaseWithAuth(
+  accessToken: string
+): SupabaseClient<Database> | null {
+  if (!isSupabaseConfigured() || !accessToken) return null;
+  return createClient<Database>(getSupabaseUrl(), getSupabaseAnonKey(), {
+    global: {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}

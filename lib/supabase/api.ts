@@ -2,6 +2,7 @@ import type { AuthUser, Project } from "@/lib/types";
 import { getSupabase } from "./client";
 import { mapAuthError } from "./errors";
 import { profileToAuthUser, projectRowToProject, projectToRow } from "./mappers";
+import { clearAccessToken, getAccessToken, saveAccessToken } from "./session";
 
 export { mapAuthError } from "./errors";
 
@@ -24,31 +25,22 @@ export async function fetchProfile(userId: string, retries = 0): Promise<AuthUse
   return profileToAuthUser(data);
 }
 
+async function fetchProfilesFromApi(approvedOnly = false): Promise<AuthUser[]> {
+  const token = await getAccessToken();
+  if (!token) return [];
+  const res = await fetch(`/api/profiles${approvedOnly ? "?approved=1" : ""}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const payload = (await res.json()) as { users?: AuthUser[] };
+  return payload.users ?? [];
+}
+
 export async function fetchAllProfiles(): Promise<AuthUser[]> {
-  const supabase = getSupabase();
-  if (!supabase) return [];
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .order("created_at", { ascending: true });
-
-  if (error || !data) return [];
-  return data.map(profileToAuthUser);
+  return fetchProfilesFromApi(false);
 }
 
 export async function fetchApprovedMembers(): Promise<AuthUser[]> {
-  const supabase = getSupabase();
-  if (!supabase) return [];
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("status", "approved")
-    .order("name", { ascending: true });
-
-  if (error || !data) return [];
-  return data.map(profileToAuthUser);
+  return fetchProfilesFromApi(true);
 }
 
 export async function updateProfileStatus(
@@ -139,6 +131,7 @@ async function applySession(session: {
   refresh_token: string;
 } | null) {
   if (!session?.access_token || !session.refresh_token) return;
+  saveAccessToken(session.access_token);
   const supabase = getSupabase();
   if (!supabase) return;
   try {
@@ -229,6 +222,7 @@ export async function signIn(
 }
 
 export async function signOut(): Promise<void> {
+  clearAccessToken();
   const supabase = getSupabase();
   if (!supabase) return;
   await supabase.auth.signOut();

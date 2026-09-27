@@ -316,6 +316,9 @@ export function useProjectHub() {
 
       if (result.user) {
         setCurrentUser(result.user);
+        if (result.user.role === "admin" && result.user.status === "approved") {
+          setAuthUsers([result.user]);
+        }
         void loadProjectsForUser(result.user);
         void loadAdminUsers(result.user);
         void loadApprovedMembers(result.user);
@@ -348,6 +351,9 @@ export function useProjectHub() {
 
       if (result.user) {
         setCurrentUser(result.user);
+        if (result.user.role === "admin" && result.user.status === "approved") {
+          setAuthUsers([result.user]);
+        }
         void loadProjectsForUser(result.user);
         void loadAdminUsers(result.user);
         void loadApprovedMembers(result.user);
@@ -667,7 +673,12 @@ export function useProjectHub() {
     authForm,
     setAuthForm,
     showUserPanel,
-    setShowUserPanel,
+    setShowUserPanel: (open: boolean) => {
+      setShowUserPanel(open);
+      if (open && currentUser) {
+        void loadAdminUsers(currentUser);
+      }
+    },
     today,
     wStart,
     wEnd,
