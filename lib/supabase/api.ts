@@ -1,38 +1,9 @@
 import type { AuthUser, Project } from "@/lib/types";
 import { getSupabase } from "./client";
+import { mapAuthError } from "./errors";
 import { profileToAuthUser, projectRowToProject, projectToRow } from "./mappers";
 
-function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      setTimeout(() => reject(new Error(message)), ms);
-    }),
-  ]);
-}
-
-export function mapAuthError(message: string): string {
-  const lower = message.toLowerCase();
-  if (lower.includes("invalid login credentials")) {
-    return "이메일 또는 비밀번호가 올바르지 않습니다";
-  }
-  if (lower.includes("user already registered")) {
-    return "이미 가입된 이메일입니다";
-  }
-  if (lower.includes("password should be at least")) {
-    return "비밀번호는 6자 이상이어야 합니다";
-  }
-  if (lower.includes("unable to validate email")) {
-    return "올바른 이메일 주소를 입력해주세요";
-  }
-  if (lower.includes("email not confirmed")) {
-    return "이메일 인증이 필요합니다. 메일함을 확인해주세요";
-  }
-  if (lower.includes("timeout") || lower.includes("timed out")) {
-    return "요청 시간이 초과되었습니다. 네트워크 연결을 확인해주세요";
-  }
-  return message;
-}
+export { mapAuthError } from "./errors";
 
 export async function fetchProfile(userId: string, retries = 0): Promise<AuthUser | null> {
   const supabase = getSupabase();
@@ -154,73 +125,107 @@ export async function insertProjects(projects: Project[]): Promise<boolean> {
   return !error;
 }
 
+async function parseJson<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error("Failed to fetch");
+  }
+}
+
+async function applySession(session: {
+  access_token: string;
+  refresh_token: string;
+} | null) {
+  if (!session?.access_token || !session.refresh_token) return;
+  const supabase = getSupabase();
+  if (!supabase) return;
+  try {
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+  } catch {
+    // Login already succeeded on the server; keep the UI session even if
+    // the browser cannot persist tokens to supabase.co directly.
+  }
+}
+
 export async function signUp(
   name: string,
   email: string,
   password: string
 ): Promise<{ user: AuthUser | null; needsEmailConfirm: boolean; error: string | null }> {
-  const supabase = getSupabase();
-  if (!supabase) {
-    return { user: null, needsEmailConfirm: false, error: "Supabase가 설정되지 않았습니다" };
+  try {
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+      }),
+    });
+    const payload = await parseJson<{
+      user: AuthUser | null;
+      session: { access_token: string; refresh_token: string } | null;
+      needsEmailConfirm: boolean;
+      error: string | null;
+    }>(res);
+    if (payload.error) {
+      return {
+        user: null,
+        needsEmailConfirm: false,
+        error: mapAuthError(payload.error),
+      };
+    }
+    await applySession(payload.session);
+    return {
+      user: payload.user,
+      needsEmailConfirm: payload.needsEmailConfirm,
+      error: null,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to fetch";
+    return {
+      user: null,
+      needsEmailConfirm: false,
+      error: mapAuthError(message),
+    };
   }
-
-  const { data, error } = await supabase.auth.signUp({
-    email: email.trim().toLowerCase(),
-    password,
-    options: { data: { name: name.trim() } },
-  });
-
-  if (error) {
-    return { user: null, needsEmailConfirm: false, error: mapAuthError(error.message) };
-  }
-
-  if (!data.user) {
-    return { user: null, needsEmailConfirm: false, error: "가입에 실패했습니다" };
-  }
-
-  if (!data.session) {
-    return { user: null, needsEmailConfirm: true, error: null };
-  }
-
-  const profile = await fetchProfile(data.user.id);
-  return { user: profile, needsEmailConfirm: false, error: null };
 }
 
 export async function signIn(
   email: string,
   password: string
 ): Promise<{ user: AuthUser | null; error: string | null }> {
-  const supabase = getSupabase();
-  if (!supabase) {
-    return { user: null, error: "Supabase가 설정되지 않았습니다" };
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        password,
+      }),
+    });
+    const payload = await parseJson<{
+      user: AuthUser | null;
+      session: { access_token: string; refresh_token: string } | null;
+      error: string | null;
+    }>(res);
+    if (payload.error) {
+      return { user: null, error: mapAuthError(payload.error) };
+    }
+    await applySession(payload.session);
+    if (!payload.user) {
+      return { user: null, error: "로그인에 실패했습니다" };
+    }
+    return { user: payload.user, error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to fetch";
+    return { user: null, error: mapAuthError(message) };
   }
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: email.trim().toLowerCase(),
-    password,
-  });
-
-  if (error) {
-    return { user: null, error: mapAuthError(error.message) };
-  }
-
-  if (!data.user) {
-    return { user: null, error: "로그인에 실패했습니다" };
-  }
-
-  const profile = await Promise.race([
-    fetchProfile(data.user.id),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
-  ]);
-  if (!profile) {
-    return {
-      user: null,
-      error:
-        "프로필을 불러올 수 없습니다. Supabase SQL 마이그레이션(001, 002) 실행 여부를 확인해주세요.",
-    };
-  }
-
-  return { user: profile, error: null };
 }
 
 export async function signOut(): Promise<void> {
