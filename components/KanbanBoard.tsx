@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { KanbanItem, ProjectMember } from "@/lib/types";
 import { milestoneTiming, milestoneTimingLabel } from "@/lib/utils";
 import { MemberAvatars } from "./Avatar";
@@ -143,6 +144,21 @@ function KanbanCard({
   );
 }
 
+function groupByProject(items: KanbanItem[]) {
+  const groups: { projectId: string; items: KanbanItem[] }[] = [];
+  const indexByProject = new Map<string, number>();
+  for (const item of items) {
+    const existing = indexByProject.get(item.projectId);
+    if (existing == null) {
+      indexByProject.set(item.projectId, groups.length);
+      groups.push({ projectId: item.projectId, items: [item] });
+    } else {
+      groups[existing].items.push(item);
+    }
+  }
+  return groups;
+}
+
 function KanbanColumn({
   title,
   subtitle,
@@ -163,6 +179,8 @@ function KanbanColumn({
   onToggleMs: (projectId: string, msId: string) => void;
 }) {
   const styles = variantStyles[variant];
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const groups = groupByProject(items);
 
   return (
     <div className={`rounded-xl p-3 border ${styles.panel}`}>
@@ -181,16 +199,48 @@ function KanbanColumn({
         {items.length === 0 ? (
           <div className={`text-center py-7 text-xs ${styles.empty}`}>{emptyLabel}</div>
         ) : (
-          items.map((item) => (
-            <KanbanCard
-              key={`${item.projectId}-${item.id}`}
-              item={item}
-              variant={variant}
-              membersLookup={membersLookup}
-              onOpen={() => onOpenProject(item.projectId)}
-              onToggle={() => onToggleMs(item.projectId, item.id)}
-            />
-          ))
+          groups.map((group) => {
+            const hiddenCount = group.items.length - 1;
+            const isOpen = expanded[group.projectId] === true;
+            const visible =
+              isOpen || hiddenCount === 0 ? group.items : group.items.slice(0, 1);
+
+            return (
+              <div key={group.projectId} className="flex flex-col gap-1.5">
+                {visible.map((item, index) => (
+                  <div
+                    key={`${item.projectId}-${item.id}`}
+                    className="flex items-center gap-1.5"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <KanbanCard
+                        item={item}
+                        variant={variant}
+                        membersLookup={membersLookup}
+                        onOpen={() => onOpenProject(item.projectId)}
+                        onToggle={() => onToggleMs(item.projectId, item.id)}
+                      />
+                    </div>
+                    {index === 0 && hiddenCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpanded((prev) => ({
+                            ...prev,
+                            [group.projectId]: !isOpen,
+                          }))
+                        }
+                        className="shrink-0 min-w-9 text-[12px] font-bold text-hub-secondary bg-white border border-hub-border rounded-full px-2 py-1"
+                        aria-expanded={isOpen}
+                      >
+                        {isOpen ? "접기" : `+ ${hiddenCount}`}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })
         )}
       </div>
     </div>
