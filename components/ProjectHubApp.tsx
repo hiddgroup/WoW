@@ -201,6 +201,9 @@ export default function ProjectHubApp() {
         onMilestoneDateChange={(mid, field, value) =>
           hub.selId && hub.setMilestoneDate(hub.selId, mid, field, value)
         }
+        onMilestoneCompletedAtChange={(mid, value) =>
+          hub.selId && hub.setMilestoneCompletedAt(hub.selId, mid, value)
+        }
         onDeleteMilestone={(mid) =>
           hub.selId && hub.deleteMilestone(hub.selId, mid)
         }

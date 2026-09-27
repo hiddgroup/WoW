@@ -40,6 +40,7 @@ import {
   milestoneOverlapsRange,
   parseDateDay,
   todayAtMidnight,
+  formatDateInput,
   applyScheduleSync,
   scheduleNeedsPersist,
   syncProjectsSchedule,
@@ -405,14 +406,32 @@ export function useProjectHub() {
   };
 
   const toggleMs = (pid: string, mid: string) => {
+    const todayStr = formatDateInput(today);
     updateProjects((p) =>
       p.id !== pid
         ? p
         : {
             ...p,
-            milestones: p.milestones.map((m) =>
-              m.id !== mid ? m : { ...m, done: !m.done }
-            ),
+            milestones: p.milestones.map((m) => {
+              if (m.id !== mid) return m;
+              if (m.completedAt) return { ...m, done: false, completedAt: undefined };
+              return { ...m, done: true, completedAt: todayStr };
+            }),
+          }
+    );
+  };
+
+  const setMilestoneCompletedAt = (pid: string, mid: string, value: string) => {
+    updateProjects((p) =>
+      p.id !== pid
+        ? p
+        : {
+            ...p,
+            milestones: p.milestones.map((m) => {
+              if (m.id !== mid) return m;
+              if (!value) return { ...m, done: false, completedAt: undefined };
+              return { ...m, done: true, completedAt: value };
+            }),
           }
     );
   };
@@ -695,6 +714,7 @@ export function useProjectHub() {
     rejectUser,
     grantAdmin,
     toggleMs,
+    setMilestoneCompletedAt,
     addMember,
     removeMember,
     archiveProject,

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { COLORS, STATUS } from "@/lib/constants";
 import type { Milestone, Project, ProjectMember, ProjectStatus } from "@/lib/types";
-import { resolveProjectMembers, milestoneStart, milestoneEnd, formatProjectRange } from "@/lib/utils";
+import { resolveProjectMembers, milestoneStart, milestoneEnd, formatProjectRange, milestoneTiming, milestoneTimingLabel } from "@/lib/utils";
 import { fmt } from "@/lib/utils";
 import { matchMemberIds } from "@/lib/wbs/matchMembers";
 import type { WbsImportResult } from "@/lib/wbs/types";
@@ -265,6 +265,7 @@ interface ProjectModalProps {
   onProjectNameChange: (name: string) => void;
   onMilestoneNameChange: (mid: string, name: string) => void;
   onMilestoneDateChange: (mid: string, field: "start" | "end", value: string) => void;
+  onMilestoneCompletedAtChange: (mid: string, value: string) => void;
   onDeleteMilestone: (mid: string) => void;
   onToggleMs: (mid: string) => void;
   onNotesChange: (notes: string) => void;
@@ -306,6 +307,7 @@ export function ProjectModal({
   onProjectNameChange,
   onMilestoneNameChange,
   onMilestoneDateChange,
+  onMilestoneCompletedAtChange,
   onDeleteMilestone,
   onToggleMs,
   onNotesChange,
@@ -559,31 +561,45 @@ export function ProjectModal({
                   milestoneStart(m, project, idx) + "T00:00:00"
                 );
                 const msEnd = new Date(milestoneEnd(m) + "T00:00:00");
-                const isInProgress = !m.done && today >= msStart && today <= msEnd;
-                const isOverdue = !m.done && msEnd < today;
+                const timing = milestoneTiming(m, today);
+                const timingLabel = milestoneTimingLabel(timing);
+                const isInProgress = timing === "scheduled" && today >= msStart && today <= msEnd;
+                const isDone = timing === "done" || timing === "done_late";
+                const timingStyle =
+                  timing === "delayed" || timing === "done_late"
+                    ? { color: "#92400E", background: "#FEF3C7" }
+                    : { color: "#166534", background: "#DCFCE7" };
 
                 return (
                   <div
                     key={m.id}
                     className="flex items-center gap-2 px-2.5 py-2 rounded-lg flex-wrap sm:flex-nowrap"
                     style={{
-                      background: m.done
-                        ? "#F0FDF4"
-                        : isInProgress
+                      background: isDone
+                        ? timing === "done_late"
                           ? "#FFFBF0"
-                          : "#F7FAF5",
-                      border: isInProgress ? "1px solid #F5E6C0" : "1px solid transparent",
+                          : "#F0FDF4"
+                        : timing === "delayed"
+                          ? "#FFFBF0"
+                          : isInProgress
+                            ? "#FFFBF0"
+                            : "#F7FAF5",
+                      border:
+                        timing === "delayed" || isInProgress
+                          ? "1px solid #F5E6C0"
+                          : "1px solid transparent",
                     }}
                   >
                     <button
                       onClick={() => onToggleMs(m.id)}
                       className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center transition-all"
                       style={{
-                        border: `2px solid ${m.done ? "#40916C" : isInProgress ? "#E8A838" : "#D3E8CA"}`,
-                        background: m.done ? "#40916C" : "transparent",
+                        border: `2px solid ${isDone ? "#40916C" : isInProgress || timing === "delayed" ? "#E8A838" : "#D3E8CA"}`,
+                        background: isDone ? "#40916C" : "transparent",
                       }}
+                      title={isDone ? "완료 해제" : "완료"}
                     >
-                      {m.done && (
+                      {isDone && (
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                           <path
                             d="M1.5 5l2.5 2.5 4.5-4.5"
@@ -600,7 +616,7 @@ export function ProjectModal({
                         value={m.name}
                         onChange={(name) => onMilestoneNameChange(m.id, name)}
                         className={`text-sm ${
-                          m.done
+                          isDone
                             ? "font-normal text-hub-muted line-through"
                             : "font-medium text-hub-text"
                         }`}
@@ -627,10 +643,25 @@ export function ProjectModal({
                         onChange={(e) => onMilestoneDateChange(m.id, "end", e.target.value)}
                         className="border border-hub-border rounded-md px-1.5 py-1 text-[11px] outline-none bg-white w-full sm:w-[118px] min-w-0"
                         style={{
-                          color: m.done ? "#8FAE94" : isOverdue ? "#B91C1C" : "#5A6B5E",
+                          color: timing === "delayed" ? "#B91C1C" : "#5A6B5E",
                         }}
-                        title="종료일"
+                        title="계획 종료일"
                       />
+                      <input
+                        type="date"
+                        value={m.completedAt ?? ""}
+                        onChange={(e) => onMilestoneCompletedAtChange(m.id, e.target.value)}
+                        className="border border-hub-border rounded-md px-1.5 py-1 text-[11px] outline-none bg-white w-full sm:w-[118px] min-w-0"
+                        title="실제 완료일"
+                      />
+                      {timingLabel && (
+                        <span
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-[10px] shrink-0 whitespace-nowrap"
+                          style={timingStyle}
+                        >
+                          {timingLabel}
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => onDeleteMilestone(m.id)}

@@ -203,6 +203,36 @@ export function getMemberNames(
   );
 }
 
+export function formatDateInput(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export type MilestoneTiming = "scheduled" | "delayed" | "done" | "done_late";
+
+/** 일정만 지난 항목은 지연. 실제 완료일이 계획 종료일보다 늦으면 지연 완료. */
+export function milestoneTiming(
+  milestone: Milestone,
+  today: Date = todayAtMidnight()
+): MilestoneTiming {
+  const plannedEnd = parseDateDay(milestoneEnd(milestone)).getTime();
+  if (milestone.completedAt) {
+    const actual = parseDateDay(milestone.completedAt).getTime();
+    return actual > plannedEnd ? "done_late" : "done";
+  }
+  if (plannedEnd < today.getTime()) return "delayed";
+  return "scheduled";
+}
+
+export function milestoneTimingLabel(timing: MilestoneTiming): string | null {
+  if (timing === "delayed") return "지연";
+  if (timing === "done_late") return "지연 완료";
+  if (timing === "done") return "완료";
+  return null;
+}
+
 export function scheduleNeedsPersist(before: Project, after: Project): boolean {
   if (before.status !== after.status) return true;
   if (before.archived !== after.archived) return true;
@@ -212,6 +242,7 @@ export function scheduleNeedsPersist(before: Project, after: Project): boolean {
     if (!a) return true;
     return (
       m.done !== a.done ||
+      m.completedAt !== a.completedAt ||
       m.start !== a.start ||
       m.end !== a.end ||
       milestoneEnd(m) !== milestoneEnd(a)
@@ -219,7 +250,7 @@ export function scheduleNeedsPersist(before: Project, after: Project): boolean {
   });
 }
 
-/** 마일스톤·프로젝트 상태를 오늘 날짜 기준으로 자동 반영 */
+/** 일정 경과 시 지연만 반영합니다. 완료·아카이브는 사용자가 직접 처리할 때만 바뀝니다. */
 export function applyScheduleSync(
   project: Project,
   today: Date = todayAtMidnight()
@@ -227,44 +258,37 @@ export function applyScheduleSync(
   if (project.archived) return project;
 
   const day = today.getTime();
-  let milestones = normalizeProjectMilestones(project).milestones.map((m) => {
-    const end = parseDateDay(milestoneEnd(m));
-    if (!m.done && end.getTime() < day) {
-      return { ...m, done: true };
-    }
+  const milestones = normalizeProjectMilestones(project).milestones.map((m) => {
+    if (m.done && !m.completedAt) return { ...m, done: false };
     return m;
   });
 
   const start = parseDateDay(project.start);
   const started = start.getTime() <= day;
-  const hasEnd = !!project.end;
+  const hasOpenOverdue = milestones.some(
+    (m) => milestoneTiming(m, today) === "delayed"
+  );
+  const hasLateCompletion = milestones.some(
+    (m) => milestoneTiming(m, today) === "done_late"
+  );
   const projectPastEnd =
-    hasEnd && parseDateDay(project.end).getTime() < day;
-
-  if (projectPastEnd) {
-    milestones = milestones.map((m) => ({ ...m, done: true }));
-  }
-
-  const allDone =
-    milestones.length > 0 && milestones.every((m) => m.done);
-  const allMilestonesPast =
-    milestones.length > 0 &&
-    milestones.every((m) => parseDateDay(milestoneEnd(m)).getTime() < day);
+    !!project.end && parseDateDay(project.end).getTime() < day;
+  const allUserDone =
+    milestones.length > 0 && milestones.every((m) => !!m.completedAt);
+  const projectPastAndOpen = projectPastEnd && !allUserDone;
+  const stillLate = hasOpenOverdue || hasLateCompletion || projectPastAndOpen;
+  const userClosed = project.status === "completed" && allUserDone;
 
   let status = project.status;
-  let archived: boolean = project.archived;
-
-  if (projectPastEnd) {
-    status = "completed";
-    archived = true;
-  } else if (allDone) {
-    status = "completed";
-    if (allMilestonesPast) archived = true;
-  } else if (started && status === "not_started") {
+  if (stillLate && !userClosed) {
+    status = "delayed";
+  } else if (!stillLate && status === "delayed") {
+    status = started ? "in_progress" : "not_started";
+  } else if (!stillLate && started && status === "not_started") {
     status = "in_progress";
   }
 
-  return { ...project, milestones, status, archived };
+  return { ...project, milestones, status, archived: project.archived };
 }
 
 export function syncProjectsSchedule(

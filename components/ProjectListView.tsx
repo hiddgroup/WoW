@@ -2,7 +2,7 @@
 
 import { STATUS } from "@/lib/constants";
 import type { Project, ProjectMember } from "@/lib/types";
-import { fmt, getMemberNames, milestoneEnd, milestoneStart, isMilestoneActiveOn, isMilestoneOverdue, parseDateDay } from "@/lib/utils";
+import { fmt, getMemberNames, milestoneEnd, milestoneStart, isMilestoneActiveOn, isMilestoneOverdue, milestoneTimingLabel, milestoneTiming, parseDateDay } from "@/lib/utils";
 
 interface ProjectListViewProps {
   projects: Project[];
@@ -95,8 +95,13 @@ export function ProjectListView({
                 <div className="text-[10px] font-bold text-hub-secondary uppercase tracking-wide mb-0.5 md:hidden">
                   진행 중인 Task
                 </div>
-                <div className="text-xs font-medium text-hub-text truncate">
-                  {cur?.name ?? "—"}
+                <div className="text-xs font-medium text-hub-text truncate flex items-center gap-1.5">
+                  <span className="truncate">{cur?.name ?? "—"}</span>
+                  {cur && milestoneTiming(cur, today) === "delayed" && (
+                    <span className="text-[10px] font-bold text-[#92400E] bg-[#FEF3C7] px-1.5 py-0.5 rounded-[10px] shrink-0">
+                      {milestoneTimingLabel("delayed")}
+                    </span>
+                  )}
                 </div>
                 <div className="text-[10px] text-hub-muted mt-px">
                   {cur && curEntry

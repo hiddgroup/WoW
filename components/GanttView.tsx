@@ -9,7 +9,7 @@ import {
   STATUS,
 } from "@/lib/constants";
 import type { Project } from "@/lib/types";
-import { calcProgress, milestoneEnd, milestoneStart, projectEffectiveEnd } from "@/lib/utils";
+import { calcProgress, milestoneEnd, milestoneStart, milestoneTiming, projectEffectiveEnd } from "@/lib/utils";
 
 interface GanttViewProps {
   projects: Project[];
@@ -281,9 +281,10 @@ export function GanttView({
                           (Math.ceil((msED.getTime() - msSD.getTime()) / 86400000) + 1) *
                             GANTT_DAY_W
                         );
+                        const timing = milestoneTiming(m, today);
                         const isIP =
-                          !m.done && today >= msSD && today <= msED;
-                        const isOD = !m.done && msED < today;
+                          timing === "scheduled" && today >= msSD && today <= msED;
+                        const isOD = timing === "delayed";
                         const msBg = m.done
                           ? "#F0FDF4"
                           : isIP
@@ -319,6 +320,16 @@ export function GanttView({
                                 {isIP && (
                                   <span className="text-[9px] font-bold text-hub-today-text bg-amber-100 px-1 py-px rounded-lg shrink-0">
                                     진행 중
+                                  </span>
+                                )}
+                                {isOD && (
+                                  <span className="text-[9px] font-bold text-[#92400E] bg-[#FEF3C7] px-1 py-px rounded-lg shrink-0">
+                                    지연
+                                  </span>
+                                )}
+                                {timing === "done_late" && (
+                                  <span className="text-[9px] font-bold text-[#92400E] bg-[#FEF3C7] px-1 py-px rounded-lg shrink-0">
+                                    지연 완료
                                   </span>
                                 )}
                               </div>
