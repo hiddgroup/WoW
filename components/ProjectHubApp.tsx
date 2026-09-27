@@ -68,6 +68,10 @@ export default function ProjectHubApp() {
     );
   }
 
+  if (!hub.sessionReady) {
+    return <div className="min-h-screen bg-hub-bg" />;
+  }
+
   if (!hub.isLoggedIn) {
     return (
       <AuthScreen

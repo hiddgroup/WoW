@@ -13,6 +13,7 @@ import {
   signIn,
   signOut,
   signUp,
+  restoreSession,
   updateProfileRole,
   updateProfileStatus,
   upsertProject,
@@ -80,13 +81,14 @@ export function useProjectHub() {
   });
   const [showUserPanel, setShowUserPanel] = useState(false);
   const [hydrated, setHydrated] = useState(true);
-  const [authLoading, setAuthLoading] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const [configError] = useState(() => !isSupabaseConfigured());
 
   const loadProjectsForUser = useCallback(async (user: AuthUser) => {
     if (user.status !== "approved") return;
 
     let loaded = await fetchProjects();
+    if (!loaded) return;
     if (loaded.length === 0) {
       await insertProjects(INITIAL_PROJECTS);
       loaded = INITIAL_PROJECTS;
@@ -132,21 +134,31 @@ export function useProjectHub() {
 
   useEffect(() => {
     const supabase = getSupabase();
-    if (!supabase) return;
+    if (!supabase) {
+      setSessionReady(true);
+      return;
+    }
 
     let mounted = true;
+
+    void (async () => {
+      try {
+        const user = await restoreSession();
+        if (!mounted || !user) return;
+        setCurrentUser(user);
+        void loadProjectsForUser(user);
+        void loadAdminUsers(user);
+        void loadApprovedMembers(user);
+      } finally {
+        if (mounted) setSessionReady(true);
+      }
+    })();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
 
-        if (event === "SIGNED_OUT") {
-          setCurrentUser(null);
-          setProjects([]);
-          setAuthUsers([]);
-          setApprovedMembers([]);
-          return;
-        }
+        if (event === "SIGNED_OUT") return;
 
         if (
           session?.user &&
@@ -154,8 +166,10 @@ export function useProjectHub() {
             event === "TOKEN_REFRESHED" ||
             event === "INITIAL_SESSION")
         ) {
-          // await 사용 시 signInWithPassword가 블로킹될 수 있음
-          void refreshCurrentUser(session.user.id);
+          window.setTimeout(() => {
+            if (!mounted) return;
+            void refreshCurrentUser(session.user.id);
+          }, 0);
         }
       }
     );
@@ -164,7 +178,7 @@ export function useProjectHub() {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [refreshCurrentUser]);
+  }, [loadAdminUsers, loadApprovedMembers, loadProjectsForUser, refreshCurrentUser]);
 
   const today = todayAtMidnight();
 
@@ -703,6 +717,7 @@ export function useProjectHub() {
     wEnd,
     kanbanData,
     isLoggedIn,
+    sessionReady,
     isApproved,
     isPending,
     isAdmin,

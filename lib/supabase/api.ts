@@ -2,7 +2,7 @@ import type { AuthUser, Project } from "@/lib/types";
 import { getSupabase } from "./client";
 import { mapAuthError } from "./errors";
 import { profileToAuthUser, projectRowToProject, projectToRow } from "./mappers";
-import { clearAccessToken, getAccessToken, saveAccessToken } from "./session";
+import { clearAccessToken, getAccessToken, loadStoredSession, saveStoredSession } from "./session";
 
 export { mapAuthError } from "./errors";
 
@@ -75,16 +75,16 @@ export async function updateProfileRole(
   return patchProfile(userId, { role });
 }
 
-export async function fetchProjects(): Promise<Project[]> {
+export async function fetchProjects(): Promise<Project[] | null> {
   const supabase = getSupabase();
-  if (!supabase) return [];
+  if (!supabase) return null;
 
   const { data, error } = await supabase
     .from("projects")
     .select("*")
     .order("created_at", { ascending: true });
 
-  if (error || !data) return [];
+  if (error || !data) return null;
   return data.map(projectRowToProject);
 }
 
@@ -132,19 +132,46 @@ async function applySession(session: {
   access_token: string;
   refresh_token: string;
 } | null) {
-  if (!session?.access_token || !session.refresh_token) return;
-  saveAccessToken(session.access_token);
+  if (!session?.access_token) return;
+  saveStoredSession(session);
   const supabase = getSupabase();
-  if (!supabase) return;
+  if (!supabase || !session.refresh_token) return;
   try {
     await supabase.auth.setSession({
       access_token: session.access_token,
       refresh_token: session.refresh_token,
     });
   } catch {
-    // Login already succeeded on the server; keep the UI session even if
-    // the browser cannot persist tokens to supabase.co directly.
+    // The app session is already stored locally. A direct browser call to
+    // Supabase can fail without logging the user out.
   }
+}
+
+export async function restoreSession(): Promise<AuthUser | null> {
+  const saved = loadStoredSession();
+  if (!saved) return null;
+
+  const res = await fetch("/api/auth/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(saved),
+  });
+  if (!res.ok) {
+    clearAccessToken();
+    return null;
+  }
+
+  const payload = (await res.json()) as {
+    user: AuthUser | null;
+    session: { access_token: string; refresh_token: string } | null;
+  };
+  if (!payload.user || !payload.session) {
+    clearAccessToken();
+    return null;
+  }
+
+  await applySession(payload.session);
+  return payload.user;
 }
 
 export async function signUp(
