@@ -81,6 +81,7 @@ export function useProjectHub() {
   });
   const [showUserPanel, setShowUserPanel] = useState(false);
   const [hydrated, setHydrated] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [configError] = useState(() => !isSupabaseConfigured());
 
