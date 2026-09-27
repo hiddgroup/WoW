@@ -43,34 +43,36 @@ export async function fetchApprovedMembers(): Promise<AuthUser[]> {
   return fetchProfilesFromApi(true);
 }
 
+async function patchProfile(
+  userId: string,
+  patch: { status?: "approved" | "rejected"; role?: "admin" | "user" }
+): Promise<boolean> {
+  const token = await getAccessToken();
+  if (!token) return false;
+  const res = await fetch("/api/profiles", {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ id: userId, ...patch }),
+  });
+  const payload = (await res.json().catch(() => null)) as { ok?: boolean } | null;
+  return res.ok && payload?.ok === true;
+}
+
 export async function updateProfileStatus(
   userId: string,
   status: "approved" | "rejected"
 ): Promise<boolean> {
-  const supabase = getSupabase();
-  if (!supabase) return false;
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({ status })
-    .eq("id", userId);
-
-  return !error;
+  return patchProfile(userId, { status });
 }
 
 export async function updateProfileRole(
   userId: string,
   role: "admin" | "user"
 ): Promise<boolean> {
-  const supabase = getSupabase();
-  if (!supabase) return false;
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({ role })
-    .eq("id", userId);
-
-  return !error;
+  return patchProfile(userId, { role });
 }
 
 export async function fetchProjects(): Promise<Project[]> {

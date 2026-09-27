@@ -29,3 +29,37 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ users: data.map(profileToAuthUser) });
 }
+
+export async function PATCH(req: Request) {
+  const token = bearerToken(req);
+  const supabase = getServerSupabaseWithAuth(token);
+  if (!supabase) {
+    return NextResponse.json({ ok: false, error: "로그인이 필요합니다" }, { status: 401 });
+  }
+
+  const body = (await req.json()) as {
+    id?: string;
+    status?: string;
+    role?: string;
+  };
+  if (!body.id) {
+    return NextResponse.json({ ok: false, error: "대상 회원이 없습니다" }, { status: 400 });
+  }
+
+  const patch: { status?: "approved" | "rejected" | "pending"; role?: "admin" | "user" } = {};
+  if (body.status === "approved" || body.status === "rejected" || body.status === "pending") {
+    patch.status = body.status;
+  }
+  if (body.role === "admin" || body.role === "user") {
+    patch.role = body.role;
+  }
+  if (!patch.status && !patch.role) {
+    return NextResponse.json({ ok: false, error: "변경할 내용이 없습니다" }, { status: 400 });
+  }
+
+  const { error } = await supabase.from("profiles").update(patch).eq("id", body.id);
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+  }
+  return NextResponse.json({ ok: true });
+}
