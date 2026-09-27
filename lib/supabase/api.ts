@@ -1,3 +1,4 @@
+import type { RecoveryParams } from "@/lib/auth/recovery";
 import type { AuthUser, Project } from "@/lib/types";
 import { getSupabase } from "./client";
 import { mapAuthError } from "./errors";
@@ -247,6 +248,35 @@ export async function signIn(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch";
     return { user: null, error: mapAuthError(message) };
+  }
+}
+
+export async function resetPassword(
+  recovery: RecoveryParams,
+  password: string
+): Promise<{ error: string | null }> {
+  try {
+    const res = await fetch("/api/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password,
+        access_token: recovery.accessToken,
+        refresh_token: recovery.refreshToken,
+        token_hash: recovery.tokenHash,
+      }),
+    });
+    const payload = await parseJson<{
+      user: AuthUser | null;
+      session: { access_token: string; refresh_token: string } | null;
+      error: string | null;
+    }>(res);
+    if (payload.error) return { error: mapAuthError(payload.error) };
+    if (payload.session) await applySession(payload.session);
+    return { error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to fetch";
+    return { error: mapAuthError(message) };
   }
 }
 

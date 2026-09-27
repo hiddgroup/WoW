@@ -9,6 +9,12 @@ export function mapAuthError(message: string): string {
   if (lower.includes("password should be at least")) {
     return "비밀번호는 6자 이상이어야 합니다";
   }
+  if (lower.includes("weak") && lower.includes("password")) {
+    return "더 안전한 비밀번호로 다시 설정해주세요";
+  }
+  if (lower.includes("different from the old password")) {
+    return "이전과 다른 비밀번호로 설정해주세요";
+  }
   if (lower.includes("unable to validate email")) {
     return "올바른 이메일 주소를 입력해주세요";
   }

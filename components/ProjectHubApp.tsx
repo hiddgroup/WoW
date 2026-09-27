@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArchiveView } from "@/components/ArchiveView";
 import { AuthScreen, PendingScreen } from "@/components/AuthScreen";
 import { Header } from "@/components/Header";
@@ -11,11 +11,20 @@ import {
   UserPanel,
 } from "@/components/Modals";
 import { ProjectSection } from "@/components/ProjectSection";
+import { ResetPasswordScreen } from "@/components/ResetPasswordScreen";
 import { useProjectHub } from "@/hooks/useProjectHub";
+import { readRecoveryParams, type RecoveryParams } from "@/lib/auth/recovery";
 import { toProjectMember, getNextWeekRange } from "@/lib/utils";
 
 export default function ProjectHubApp() {
   const hub = useProjectHub();
+  const [recoveryChecked, setRecoveryChecked] = useState(false);
+  const [recovery, setRecovery] = useState<RecoveryParams | null>(null);
+
+  useEffect(() => {
+    setRecovery(readRecoveryParams());
+    setRecoveryChecked(true);
+  }, []);
   const projectMembers = useMemo(
     () => hub.approvedMembers.map(toProjectMember),
     [hub.approvedMembers]
@@ -65,6 +74,21 @@ export default function ProjectHubApp() {
           )}
         </div>
       </div>
+    );
+  }
+
+  if (!recoveryChecked) {
+    return <div className="min-h-screen bg-hub-bg" />;
+  }
+
+  if (recovery) {
+    return (
+      <ResetPasswordScreen
+        recovery={recovery}
+        onDone={() => {
+          window.location.replace("/");
+        }}
+      />
     );
   }
 
