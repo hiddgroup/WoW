@@ -8,8 +8,8 @@ import {
   GANTT_ROW_H,
   STATUS,
 } from "@/lib/constants";
-import type { Project } from "@/lib/types";
-import { calcProgress, milestoneEnd, milestoneStart, milestoneTiming, projectEffectiveEnd } from "@/lib/utils";
+import type { Project, ProjectMember } from "@/lib/types";
+import { calcProgress, getMemberNames, milestoneEnd, milestoneStart, milestoneTiming, projectEffectiveEnd } from "@/lib/utils";
 
 interface GanttViewProps {
   projects: Project[];
@@ -17,6 +17,7 @@ interface GanttViewProps {
   onToggleExpand: (id: string) => void;
   onOpenProject: (id: string) => void;
   today: Date;
+  membersLookup: ProjectMember[];
 }
 
 export function GanttView({
@@ -25,6 +26,7 @@ export function GanttView({
   onToggleExpand,
   onOpenProject,
   today,
+  membersLookup,
 }: GanttViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [labelW, setLabelW] = useState(GANTT_LABEL_W);
@@ -314,8 +316,18 @@ export function GanttView({
                                 }}
                               />
                               <div className="min-w-0 flex-1 flex items-center gap-1">
-                                <span className="text-xs text-hub-text truncate flex-1">
+                                <span
+                                  className="text-xs text-hub-text truncate flex-1"
+                                  title={
+                                    m.assignees?.length
+                                      ? `${m.name} · ${getMemberNames(m.assignees, membersLookup)}`
+                                      : m.name
+                                  }
+                                >
                                   {m.name}
+                                  {m.assignees?.length
+                                    ? ` · ${getMemberNames(m.assignees, membersLookup)}`
+                                    : ""}
                                 </span>
                                 {isIP && (
                                   <span className="text-[9px] font-bold text-hub-today-text bg-amber-100 px-1 py-px rounded-lg shrink-0">

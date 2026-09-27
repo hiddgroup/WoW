@@ -108,6 +108,11 @@ export function ProjectListView({
                     ? `${fmt(milestoneStart(cur, p, curEntry.idx))} ~ ${fmt(milestoneEnd(cur))}`
                     : ""}
                 </div>
+                {cur?.assignees?.length ? (
+                  <div className="text-[10px] text-hub-secondary truncate mt-px">
+                    {getMemberNames(cur.assignees, membersLookup)}
+                  </div>
+                ) : null}
               </div>
               <div className="min-w-0">
                 <div className="text-[10px] font-bold text-hub-secondary uppercase tracking-wide mb-0.5 md:hidden">
@@ -121,6 +126,11 @@ export function ProjectListView({
                     ? `${fmt(milestoneStart(nxt, p, nxtEntry.idx))} ~ ${fmt(milestoneEnd(nxt))}`
                     : ""}
                 </div>
+                {nxt?.assignees?.length ? (
+                  <div className="text-[10px] text-hub-secondary truncate mt-px">
+                    {getMemberNames(nxt.assignees, membersLookup)}
+                  </div>
+                ) : null}
               </div>
               <div className="text-xs text-hub-secondary truncate">
                 <span className="md:hidden text-[10px] font-bold text-hub-secondary uppercase tracking-wide mr-2">

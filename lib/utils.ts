@@ -85,7 +85,7 @@ export function rangesOverlap(
 }
 
 export function getWeekRange(today: Date) {
-  const dow = today.getDay() === 0 ? 6 : today.getDay() - 1;
+  const dow = today.getDay();
   const wStart = new Date(today);
   wStart.setDate(today.getDate() - dow);
   wStart.setHours(0, 0, 0, 0);
@@ -120,6 +120,12 @@ export function milestoneStart(
   return prevMs ? milestoneEnd(prevMs) : project.start;
 }
 
+function normalizeAssignees(ids: string[] | undefined): string[] | undefined {
+  if (!ids?.length) return undefined;
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  return unique.length ? unique : undefined;
+}
+
 export function normalizeMilestone(
   milestone: Milestone,
   project: Project,
@@ -127,8 +133,11 @@ export function normalizeMilestone(
 ): Milestone {
   const end = milestoneEnd(milestone);
   const start = milestoneStart({ ...milestone, end }, project, index);
-  const { due: _due, ...rest } = milestone;
-  return { ...rest, start, end };
+  const { due: _due, assignees, ...rest } = milestone;
+  const nextAssignees = normalizeAssignees(assignees);
+  return nextAssignees
+    ? { ...rest, start, end, assignees: nextAssignees }
+    : { ...rest, start, end };
 }
 
 export function normalizeProjectMilestones(project: Project): Project {
@@ -183,6 +192,16 @@ export function milestoneOverlapsRange(
   const start = parseDateDay(milestoneStart(milestone, project, index));
   const end = parseDateDay(milestoneEnd(milestone));
   return rangesOverlap(start, end, rangeStart, rangeEnd);
+}
+
+export function milestoneCompletedInRange(
+  milestone: Milestone,
+  rangeStart: Date,
+  rangeEnd: Date
+): boolean {
+  if (!milestone.done || !milestone.completedAt) return false;
+  const completed = parseDateDay(milestone.completedAt);
+  return rangesOverlap(completed, completed, rangeStart, rangeEnd);
 }
 
 export function calcProgress(milestones: Milestone[]) {

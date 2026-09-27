@@ -16,6 +16,8 @@ export interface Milestone {
   done: boolean;
   /** 사용자가 입력한 실제 완료일. 없으면 일정 경과만으로 완료 처리하지 않습니다. */
   completedAt?: string;
+  /** 이 마일스톤의 담당자. 승인된 회원 id 목록입니다. */
+  assignees?: string[];
   /** @deprecated legacy field — use end */
   due?: string;
 }

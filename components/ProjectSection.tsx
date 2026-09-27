@@ -73,6 +73,7 @@ export function ProjectSection({
           onToggleExpand={onToggleGanttExpand}
           onOpenProject={onOpenProject}
           today={today}
+          membersLookup={membersLookup}
         />
       )}
       {projectView === "calendar" && (

@@ -29,7 +29,7 @@ export const TEAM = [
   { id: "tm5", name: "정현우", color: "#7B62A3" },
 ];
 
-export const DAY_HEADERS = ["월", "화", "수", "목", "금", "토", "일"];
+export const DAY_HEADERS = ["일", "월", "화", "수", "목", "금", "토"];
 
 export const GANTT_DAY_W = 16;
 export const GANTT_ROW_H = 52;

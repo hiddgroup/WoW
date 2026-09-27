@@ -1,4 +1,5 @@
-import type { ProjectMember } from "@/lib/types";
+import type { Milestone, ProjectMember } from "@/lib/types";
+import type { WbsMilestone } from "@/lib/wbs/types";
 
 const TITLE_SUFFIXES = [
   "실장님",
@@ -55,4 +56,15 @@ export function matchMemberIds(
   }
 
   return { memberIds: Array.from(memberIds), unmatched };
+}
+
+export function milestonesWithOwners(
+  milestones: WbsMilestone[],
+  approvedMembers: ProjectMember[]
+): Milestone[] {
+  return milestones.map((milestone) => {
+    const { ownerNames, ...rest } = milestone;
+    const assignees = matchMemberIds(ownerNames ?? [], approvedMembers).memberIds;
+    return assignees.length ? { ...rest, assignees } : rest;
+  });
 }

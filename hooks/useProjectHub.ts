@@ -39,6 +39,7 @@ import {
   isMilestoneActiveOn,
   isMilestoneOverdue,
   milestoneOverlapsRange,
+  milestoneCompletedInRange,
   parseDateDay,
   todayAtMidnight,
   formatDateInput,
@@ -242,8 +243,6 @@ export function useProjectHub() {
 
     active.forEach((proj) => {
       proj.milestones.forEach((m, idx) => {
-        if (m.done) return;
-
         const item: KanbanItem = {
           ...m,
           projectId: proj.id,
@@ -252,17 +251,21 @@ export function useProjectHub() {
           rangeFmt: milestoneRangeFmt(proj, m, idx),
         };
 
+        const overlapsThisWeek =
+          milestoneOverlapsRange(m, proj, idx, wStart, wEnd) ||
+          milestoneCompletedInRange(m, wStart, wEnd);
+        if (overlapsThisWeek) {
+          kanbanUpcoming.push(item);
+        }
+
+        if (m.done) return;
+
         const activeToday = isMilestoneActiveOn(m, proj, idx, today);
         const overdue = isMilestoneOverdue(m, proj, idx, today);
-        const overlapsThisWeek = milestoneOverlapsRange(m, proj, idx, wStart, wEnd);
         const overlapsNextWeek = milestoneOverlapsRange(m, proj, idx, nwStart, nwEnd);
 
         if (activeToday || overdue) {
           kanbanToday.push(item);
-        }
-
-        if (overlapsThisWeek) {
-          kanbanUpcoming.push(item);
         }
 
         if (overlapsNextWeek) {
@@ -275,7 +278,10 @@ export function useProjectHub() {
       parseDateDay(milestoneEnd(a)).getTime() - parseDateDay(milestoneEnd(b)).getTime();
 
     kanbanToday.sort(byEnd);
-    kanbanUpcoming.sort(byEnd);
+    kanbanUpcoming.sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      return byEnd(a, b);
+    });
     kanbanNextWeek.sort(byEnd);
 
     const taskKeys = new Set<string>();
@@ -543,6 +549,40 @@ export function useProjectHub() {
     );
   };
 
+  const addMilestoneAssignee = (pid: string, mid: string, uid: string) => {
+    if (!uid) return;
+    updateProjects((p) => {
+      if (p.id !== pid) return p;
+      return {
+        ...p,
+        milestones: p.milestones.map((m) => {
+          if (m.id !== mid) return m;
+          const assignees = m.assignees ?? [];
+          if (assignees.includes(uid)) return m;
+          return { ...m, assignees: [...assignees, uid] };
+        }),
+      };
+    });
+  };
+
+  const removeMilestoneAssignee = (pid: string, mid: string, uid: string) => {
+    updateProjects((p) => {
+      if (p.id !== pid) return p;
+      return {
+        ...p,
+        milestones: p.milestones.map((m) => {
+          if (m.id !== mid) return m;
+          const assignees = (m.assignees ?? []).filter((id) => id !== uid);
+          if (assignees.length === 0) {
+            const { assignees: _removed, ...rest } = m;
+            return rest;
+          }
+          return { ...m, assignees };
+        }),
+      };
+    });
+  };
+
   const deleteMilestone = (pid: string, mid: string) => {
     const project = projects.find((p) => p.id === pid);
     const ms = project?.milestones.find((m) => m.id === mid);
@@ -741,6 +781,8 @@ export function useProjectHub() {
     setProjectName,
     setMilestoneName,
     setMilestoneDate,
+    addMilestoneAssignee,
+    removeMilestoneAssignee,
     deleteMilestone,
     addMs,
     addFile,

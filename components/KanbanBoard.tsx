@@ -1,6 +1,7 @@
 "use client";
 
 import type { KanbanItem, ProjectMember } from "@/lib/types";
+import { milestoneTiming, milestoneTimingLabel } from "@/lib/utils";
 import { MemberAvatars } from "./Avatar";
 import { CheckIcon } from "./icons";
 
@@ -14,7 +15,6 @@ interface KanbanBoardProps {
   taskCount: number;
   onOpenProject: (id: string) => void;
   onToggleMs: (projectId: string, msId: string) => void;
-  getProjectMembers: (projectId: string) => string[];
   membersLookup: ProjectMember[];
 }
 
@@ -60,19 +60,28 @@ const variantStyles: Record<
 function KanbanCard({
   item,
   variant,
-  memberIds,
   membersLookup,
   onOpen,
   onToggle,
 }: {
   item: KanbanItem;
   variant: KanbanVariant;
-  memberIds: string[];
   membersLookup: ProjectMember[];
   onOpen: () => void;
   onToggle: () => void;
 }) {
   const styles = variantStyles[variant];
+  const timing = item.done ? milestoneTiming(item) : null;
+  const doneLabel =
+    timing === "done" || timing === "done_late"
+      ? milestoneTimingLabel(timing)
+      : item.done
+        ? "완료"
+        : null;
+  const doneStyle =
+    timing === "done_late"
+      ? { color: "#92400E", background: "#FEF3C7" }
+      : { color: "#166534", background: "#DCFCE7" };
   const borderColor =
     variant === "today"
       ? "border-hub-today-border"
@@ -92,19 +101,33 @@ function KanbanCard({
           />
           <span className="text-xs text-hub-muted truncate">{item.projectName}</span>
         </div>
-        <div
-          className={`text-sm leading-snug ${
-            item.done
-              ? "font-normal text-hub-muted line-through"
-              : "font-semibold text-hub-text"
-          }`}
-        >
-          {item.name}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div
+            className={`text-sm leading-snug truncate ${
+              item.done
+                ? "font-normal text-hub-muted line-through"
+                : "font-semibold text-hub-text"
+            }`}
+          >
+            {item.name}
+          </div>
+          {doneLabel && (
+            <span
+              className="text-[10px] font-bold px-1.5 py-0.5 rounded-[10px] shrink-0"
+              style={doneStyle}
+            >
+              {doneLabel}
+            </span>
+          )}
         </div>
         <div className={`text-[10px] mt-0.5 ${styles.date}`}>{item.rangeFmt}</div>
       </div>
-      {memberIds.length > 0 && (
-        <MemberAvatars memberIds={memberIds} membersLookup={membersLookup} size="sm" />
+      {(item.assignees?.length ?? 0) > 0 && (
+        <MemberAvatars
+          memberIds={item.assignees ?? []}
+          membersLookup={membersLookup}
+          size="sm"
+        />
       )}
       <button
         onClick={onToggle}
@@ -126,7 +149,6 @@ function KanbanColumn({
   items,
   variant,
   emptyLabel,
-  getProjectMembers,
   membersLookup,
   onOpenProject,
   onToggleMs,
@@ -136,7 +158,6 @@ function KanbanColumn({
   items: KanbanItem[];
   variant: KanbanVariant;
   emptyLabel: string;
-  getProjectMembers: (projectId: string) => string[];
   membersLookup: ProjectMember[];
   onOpenProject: (id: string) => void;
   onToggleMs: (projectId: string, msId: string) => void;
@@ -165,7 +186,6 @@ function KanbanColumn({
               key={`${item.projectId}-${item.id}`}
               item={item}
               variant={variant}
-              memberIds={getProjectMembers(item.projectId)}
               membersLookup={membersLookup}
               onOpen={() => onOpenProject(item.projectId)}
               onToggle={() => onToggleMs(item.projectId, item.id)}
@@ -187,7 +207,6 @@ export function KanbanBoard({
   taskCount,
   onOpenProject,
   onToggleMs,
-  getProjectMembers,
   membersLookup,
 }: KanbanBoardProps) {
   return (
@@ -208,7 +227,6 @@ export function KanbanBoard({
           items={kanbanToday}
           variant="today"
           emptyLabel="진행 중인 Task 없음"
-          getProjectMembers={getProjectMembers}
           membersLookup={membersLookup}
           onOpenProject={onOpenProject}
           onToggleMs={onToggleMs}
@@ -220,7 +238,6 @@ export function KanbanBoard({
             items={kanbanUpcoming}
             variant="upcoming"
             emptyLabel="이번 주 Task 없음"
-            getProjectMembers={getProjectMembers}
             membersLookup={membersLookup}
             onOpenProject={onOpenProject}
             onToggleMs={onToggleMs}
@@ -231,7 +248,6 @@ export function KanbanBoard({
             items={kanbanNextWeek}
             variant="nextWeek"
             emptyLabel="예정된 Task 없음"
-            getProjectMembers={getProjectMembers}
             membersLookup={membersLookup}
             onOpenProject={onOpenProject}
             onToggleMs={onToggleMs}

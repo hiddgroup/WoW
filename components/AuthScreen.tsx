@@ -1,6 +1,27 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
+
+const SAVED_ID_KEY = "hidd-wow-saved-id";
+
+function readSavedId(): string {
+  try {
+    return localStorage.getItem(SAVED_ID_KEY)?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeSavedId(email: string) {
+  try {
+    const value = email.trim();
+    if (value) localStorage.setItem(SAVED_ID_KEY, value);
+    else localStorage.removeItem(SAVED_ID_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 interface AuthScreenProps {
   authView: "login" | "signup";
@@ -27,10 +48,38 @@ export function AuthScreen({
   onGoLogin,
   onGoSignup,
 }: AuthScreenProps) {
+  const [rememberId, setRememberId] = useState(false);
   const inputClass =
     "w-full border border-hub-border rounded-[10px] px-3.5 py-2.5 text-sm outline-none bg-white";
   const isSuccessNotice =
     authForm.error.includes("완료되었습니다") || authForm.error.includes("인증 후");
+
+  useEffect(() => {
+    if (readSavedId()) setRememberId(true);
+  }, []);
+
+  useEffect(() => {
+    if (authView !== "login" || !rememberId) return;
+    const saved = readSavedId();
+    if (saved && saved !== authForm.email) onEmailChange(saved);
+  }, [authView, rememberId, authForm.email, onEmailChange]);
+
+  const handleEmailChange = (value: string) => {
+    onEmailChange(value);
+    if (rememberId) writeSavedId(value);
+  };
+
+  const handleRememberChange = (checked: boolean) => {
+    setRememberId(checked);
+    if (checked) writeSavedId(authForm.email);
+    else writeSavedId("");
+  };
+
+  const handleLogin = () => {
+    if (rememberId) writeSavedId(authForm.email);
+    else writeSavedId("");
+    onLogin();
+  };
 
   return (
     <div className="min-h-screen bg-hub-bg flex items-center justify-center p-4 sm:p-6">
@@ -54,8 +103,9 @@ export function AuthScreen({
                 <input
                   type="email"
                   value={authForm.email}
-                  onChange={(e) => onEmailChange(e.target.value)}
+                  onChange={(e) => handleEmailChange(e.target.value)}
                   placeholder="이메일 주소 입력"
+                  autoComplete="username"
                   className={inputClass}
                 />
               </div>
@@ -68,9 +118,19 @@ export function AuthScreen({
                   value={authForm.password}
                   onChange={(e) => onPasswordChange(e.target.value)}
                   placeholder="비밀번호 입력"
+                  autoComplete="current-password"
                   className={inputClass}
                 />
               </div>
+              <label className="flex items-center gap-2 text-[13px] text-hub-secondary cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberId}
+                  onChange={(e) => handleRememberChange(e.target.checked)}
+                  className="h-4 w-4 accent-[#1a2e1e]"
+                />
+                아이디 저장
+              </label>
             </div>
             {authForm.error && (
               <div
@@ -84,7 +144,7 @@ export function AuthScreen({
               </div>
             )}
             <button
-              onClick={onLogin}
+              onClick={handleLogin}
               disabled={authLoading}
               className="w-full bg-hub-primary text-hub-primary-foreground rounded-[10px] py-3.5 text-[15px] font-semibold disabled:opacity-60"
             >

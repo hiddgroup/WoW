@@ -123,9 +123,6 @@ export default function ProjectHubApp() {
   const { nwStart, nwEnd } = getNextWeekRange(hub.today);
   const nextWeekStr = `${nwStart.getMonth() + 1}/${nwStart.getDate()} ~ ${nwEnd.getMonth() + 1}/${nwEnd.getDate()}`;
 
-  const getProjectMembers = (projectId: string) =>
-    hub.projects.find((p) => p.id === projectId)?.members ?? [];
-
   return (
     <div className="min-h-screen bg-hub-bg text-hub-text overflow-x-hidden">
       <Header
@@ -153,7 +150,6 @@ export default function ProjectHubApp() {
               taskCount={hub.kanbanData.taskCount}
               onOpenProject={hub.openProject}
               onToggleMs={hub.toggleMs}
-              getProjectMembers={getProjectMembers}
               membersLookup={projectMembers}
             />
             <ProjectSection
@@ -207,6 +203,12 @@ export default function ProjectHubApp() {
         }
         onMilestoneCompletedAtChange={(mid, value) =>
           hub.selId && hub.setMilestoneCompletedAt(hub.selId, mid, value)
+        }
+        onAddMilestoneAssignee={(mid, userId) =>
+          hub.selId && hub.addMilestoneAssignee(hub.selId, mid, userId)
+        }
+        onRemoveMilestoneAssignee={(mid, userId) =>
+          hub.selId && hub.removeMilestoneAssignee(hub.selId, mid, userId)
         }
         onDeleteMilestone={(mid) =>
           hub.selId && hub.deleteMilestone(hub.selId, mid)

@@ -1,5 +1,4 @@
-import type { Milestone } from "@/lib/types";
-import type { WbsImportResult } from "@/lib/wbs/types";
+import type { WbsImportResult, WbsMilestone } from "@/lib/wbs/types";
 
 export type { WbsImportResult };
 
@@ -232,7 +231,7 @@ export async function parseWbsWorkbook(
 
   const { cols, rowIndex } = header;
   const projectName = extractProjectName(rows);
-  const milestones: Milestone[] = [];
+  const milestones: WbsMilestone[] = [];
   const ownerSet = new Set<string>();
   let skippedRows = 0;
   let idCounter = 0;
@@ -275,6 +274,20 @@ export async function parseWbsWorkbook(
     const progress = cols.progress != null ? parseProgress(row[cols.progress]) : 0;
     const name = [wbs, title].filter(Boolean).join(" ");
 
+    const ownerNames: string[] = [];
+    if (cols.owner != null) {
+      splitNames(cellToString(row[cols.owner])).forEach((n) => {
+        ownerNames.push(n);
+        ownerSet.add(n);
+      });
+    }
+    if (cols.supporter != null) {
+      splitNames(cellToString(row[cols.supporter])).forEach((n) => {
+        ownerNames.push(n);
+        ownerSet.add(n);
+      });
+    }
+
     idCounter += 1;
     milestones.push({
       id: `ms_wbs_${Date.now()}_${idCounter}`,
@@ -282,14 +295,8 @@ export async function parseWbsWorkbook(
       start: startDate,
       end: endDate,
       done: progress >= 1,
+      ownerNames,
     });
-
-    if (cols.owner != null) {
-      splitNames(cellToString(row[cols.owner])).forEach((n) => ownerSet.add(n));
-    }
-    if (cols.supporter != null) {
-      splitNames(cellToString(row[cols.supporter])).forEach((n) => ownerSet.add(n));
-    }
   }
 
   if (milestones.length === 0) {

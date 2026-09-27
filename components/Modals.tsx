@@ -5,7 +5,7 @@ import { COLORS, STATUS } from "@/lib/constants";
 import type { Milestone, Project, ProjectMember, ProjectStatus } from "@/lib/types";
 import { resolveProjectMembers, milestoneStart, milestoneEnd, formatProjectRange, milestoneTiming, milestoneTimingLabel } from "@/lib/utils";
 import { fmt } from "@/lib/utils";
-import { matchMemberIds } from "@/lib/wbs/matchMembers";
+import { matchMemberIds, milestonesWithOwners } from "@/lib/wbs/matchMembers";
 import type { WbsImportResult } from "@/lib/wbs/types";
 import { FileIcon } from "./icons";
 import {
@@ -55,6 +55,68 @@ function InlineEditableName({
       placeholder={placeholder}
       className={`w-full bg-transparent outline-none border border-transparent rounded-md px-1 -mx-1 focus:border-hub-border focus:bg-white ${className}`}
     />
+  );
+}
+
+function MilestoneAssignees({
+  assigneeIds,
+  approvedMembers,
+  onAdd,
+  onRemove,
+}: {
+  assigneeIds: string[];
+  approvedMembers: ProjectMember[];
+  onAdd: (userId: string) => void;
+  onRemove: (userId: string) => void;
+}) {
+  const assigned = resolveProjectMembers(assigneeIds, approvedMembers);
+  const available = approvedMembers.filter((member) => !assigneeIds.includes(member.id));
+
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap pl-7">
+      <span className="text-[10px] font-semibold text-hub-muted">담당</span>
+      {assigned.map((member) => (
+        <span
+          key={member.id}
+          className="inline-flex items-center gap-1 text-[11px] bg-white border border-hub-border rounded-full pl-1 pr-1 py-0.5"
+        >
+          <span
+            className="w-4 h-4 rounded-full text-white text-[8px] font-bold flex items-center justify-center"
+            style={{ background: member.color }}
+          >
+            {member.name[0]}
+          </span>
+          {member.name}
+          <button
+            type="button"
+            onClick={() => onRemove(member.id)}
+            className="text-hub-muted leading-none px-0.5"
+            aria-label={`${member.name} 담당 해제`}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {available.length > 0 ? (
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value) onAdd(e.target.value);
+          }}
+          className="border border-hub-border rounded-md px-1.5 py-1 text-[11px] outline-none bg-white text-hub-secondary"
+          aria-label="마일스톤 담당자 추가"
+        >
+          <option value="">담당자 추가</option>
+          {available.map((member) => (
+            <option key={member.id} value={member.id}>
+              {member.name}
+            </option>
+          ))}
+        </select>
+      ) : assigned.length === 0 ? (
+        <span className="text-[11px] text-hub-muted">승인된 회원이 없습니다</span>
+      ) : null}
+    </div>
   );
 }
 
@@ -227,7 +289,7 @@ export function AddProjectModal({
               onSubmit(
                 wbs
                   ? {
-                      milestones: wbs.milestones,
+                      milestones: milestonesWithOwners(wbs.milestones, approvedMembers),
                       members: match.memberIds,
                     }
                   : undefined
@@ -266,6 +328,8 @@ interface ProjectModalProps {
   onMilestoneNameChange: (mid: string, name: string) => void;
   onMilestoneDateChange: (mid: string, field: "start" | "end", value: string) => void;
   onMilestoneCompletedAtChange: (mid: string, value: string) => void;
+  onAddMilestoneAssignee: (mid: string, userId: string) => void;
+  onRemoveMilestoneAssignee: (mid: string, userId: string) => void;
   onDeleteMilestone: (mid: string) => void;
   onToggleMs: (mid: string) => void;
   onNotesChange: (notes: string) => void;
@@ -308,6 +372,8 @@ export function ProjectModal({
   onMilestoneNameChange,
   onMilestoneDateChange,
   onMilestoneCompletedAtChange,
+  onAddMilestoneAssignee,
+  onRemoveMilestoneAssignee,
   onDeleteMilestone,
   onToggleMs,
   onNotesChange,
@@ -545,7 +611,11 @@ export function ProjectModal({
                   <button
                     type="button"
                     onClick={() => {
-                      onImportWbs(wbs.milestones, wbsMode, wbsMatch.memberIds);
+                      onImportWbs(
+                        milestonesWithOwners(wbs.milestones, approvedMembers),
+                        wbsMode,
+                        wbsMatch.memberIds
+                      );
                       setWbs(null);
                     }}
                     className="px-3.5 py-1.5 rounded-lg text-[13px] font-semibold bg-hub-primary text-hub-primary-foreground"
@@ -573,7 +643,7 @@ export function ProjectModal({
                 return (
                   <div
                     key={m.id}
-                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg flex-wrap sm:flex-nowrap"
+                    className="flex flex-col gap-1.5 px-2.5 py-2 rounded-lg"
                     style={{
                       background: isDone
                         ? timing === "done_late"
@@ -590,6 +660,7 @@ export function ProjectModal({
                           : "1px solid transparent",
                     }}
                   >
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                     <button
                       onClick={() => onToggleMs(m.id)}
                       className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center transition-all"
@@ -672,6 +743,13 @@ export function ProjectModal({
                         ×
                       </button>
                     </div>
+                    </div>
+                    <MilestoneAssignees
+                      assigneeIds={m.assignees ?? []}
+                      approvedMembers={approvedMembers}
+                      onAdd={(userId) => onAddMilestoneAssignee(m.id, userId)}
+                      onRemove={(userId) => onRemoveMilestoneAssignee(m.id, userId)}
+                    />
                   </div>
                 );
               })}

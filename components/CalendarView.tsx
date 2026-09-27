@@ -51,7 +51,7 @@ function dateInRange(dateStr: string, start: string, end: string): boolean {
 function buildWeeks(calYear: number, calMonth: number, today: Date): DayCell[][] {
   const firstDay = new Date(calYear, calMonth, 1);
   const lastDay = new Date(calYear, calMonth + 1, 0);
-  const pad = (firstDay.getDay() + 6) % 7;
+  const pad = firstDay.getDay();
   const days: DayCell[] = [];
 
   for (let i = 0; i < pad; i++) {
