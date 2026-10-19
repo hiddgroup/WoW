@@ -2,13 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { COLORS } from "@/lib/constants";
-import { INITIAL_PROJECTS } from "@/lib/data";
 import {
   fetchAllProfiles,
   fetchApprovedMembers,
   fetchProfile,
   fetchProjects,
-  insertProjects,
   deleteProjectFromDb,
   signIn,
   signOut,
@@ -89,12 +87,10 @@ export function useProjectHub() {
   const loadProjectsForUser = useCallback(async (user: AuthUser) => {
     if (user.status !== "approved") return;
 
-    let loaded = await fetchProjects();
+    // An empty table means the team has no projects yet. Never re-insert the
+    // sample data here: doing so brought deleted examples back on every reload.
+    const loaded = await fetchProjects();
     if (!loaded) return;
-    if (loaded.length === 0) {
-      await insertProjects(INITIAL_PROJECTS);
-      loaded = INITIAL_PROJECTS;
-    }
 
     const today = todayAtMidnight();
     const synced = syncProjectsSchedule(loaded, today);

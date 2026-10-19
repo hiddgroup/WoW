@@ -7,6 +7,21 @@ import { clearAccessToken, getAccessToken, loadStoredSession, saveStoredSession 
 
 export { mapAuthError } from "./errors";
 
+let lastSaveAlert = 0;
+
+/** Saves used to fail silently, so changes vanished on reload. Tell the user instead. */
+function reportSaveError(action: string, error: { message?: string } | null) {
+  if (!error) return;
+  console.error(`[HiDD WoW] ${action} failed`, error);
+  if (typeof window === "undefined") return;
+  const now = Date.now();
+  if (now - lastSaveAlert < 5000) return;
+  lastSaveAlert = now;
+  window.alert(
+    `${action}에 실패했습니다. 새로고침하면 이 변경은 사라집니다.\n\n원인: ${error.message ?? "알 수 없는 오류"}`
+  );
+}
+
 export async function fetchProfile(userId: string, retries = 0): Promise<AuthUser | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
@@ -97,6 +112,7 @@ export async function upsertProject(project: Project): Promise<boolean> {
     .from("projects")
     .upsert(projectToRow(project), { onConflict: "id" });
 
+  reportSaveError("프로젝트 저장", error);
   return !error;
 }
 
@@ -106,6 +122,7 @@ export async function deleteProjectFromDb(projectId: string): Promise<boolean> {
 
   const { error } = await supabase.from("projects").delete().eq("id", projectId);
 
+  reportSaveError("프로젝트 삭제", error);
   return !error;
 }
 
