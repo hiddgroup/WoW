@@ -14,6 +14,9 @@ const HOP_BY_HOP = new Set([
   "upgrade",
   "host",
   "content-length",
+  // Node's fetch already decompressed the body; forwarding this header made
+  // browsers fail to decode the response ("Failed to fetch").
+  "content-encoding",
 ]);
 
 const FORWARD_REQUEST_HEADERS = [

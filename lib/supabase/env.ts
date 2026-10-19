@@ -34,8 +34,9 @@ export function isSupabaseConfigured(): boolean {
   }
 }
 
+// Data requests go straight to Supabase. The /sb relay answered reads but
+// failed every write (POST/PATCH/DELETE returned 503), so nothing could be saved.
+// Login and sign-up still go through the app's own /api/auth routes.
 export function getBrowserSupabaseUrl(): string {
-  const direct = getSupabaseUrl();
-  if (typeof window === "undefined") return direct;
-  return `${window.location.origin}/sb`;
+  return getSupabaseUrl();
 }
