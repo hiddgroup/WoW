@@ -270,8 +270,6 @@ export function scheduleNeedsPersist(before: Project, after: Project): boolean {
 }
 
 /** 일정 경과 시 지연만 반영합니다. 완료·아카이브는 사용자가 직접 처리할 때만 바뀝니다. */
-const MANUAL_STATUSES = new Set<ProjectStatus>(["at_risk", "completed", "on_hold"]);
-
 export function applyScheduleSync(
   project: Project,
   today: Date = todayAtMidnight()
@@ -283,28 +281,12 @@ export function applyScheduleSync(
     return m;
   });
 
-  // 위험, 완료 and 보류 are chosen by a person, so they always stick.
-  // Only 시작 전 / 진행 중 / 지연 follow the schedule automatically.
-  if (MANUAL_STATUSES.has(project.status)) {
-    return { ...project, milestones };
-  }
-
-  const day = today.getTime();
-  const started = parseDateDay(project.start).getTime() <= day;
-  // A task finished late no longer keeps the project in 지연 forever;
-  // only work that is still open and past its date does.
-  const hasOpenOverdue = milestones.some(
-    (m) => milestoneTiming(m, today) === "delayed"
-  );
-  const allUserDone =
-    milestones.length > 0 && milestones.every((m) => !!m.completedAt);
-  const projectPastAndOpen =
-    !!project.end && parseDateDay(project.end).getTime() < day && !allUserDone;
-  const stillLate = hasOpenOverdue || projectPastAndOpen;
-
-  let status: ProjectStatus;
-  if (stillLate) status = "delayed";
-  else status = started ? "in_progress" : "not_started";
+  // The project status is whatever the team picked; it is never switched to
+  // 지연 automatically (overdue tasks still show their own 지연 badge).
+  // The only automatic change: 시작 전 becomes 진행 중 once the start date passes.
+  let status = project.status;
+  const started = parseDateDay(project.start).getTime() <= today.getTime();
+  if (status === "not_started" && started) status = "in_progress";
 
   return { ...project, milestones, status, archived: project.archived };
 }
