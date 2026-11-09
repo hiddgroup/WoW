@@ -3,7 +3,8 @@ export type ProjectStatus =
   | "in_progress"
   | "at_risk"
   | "completed"
-  | "delayed";
+  | "delayed"
+  | "on_hold";
 
 export type UserRole = "admin" | "user";
 export type UserStatus = "approved" | "pending" | "rejected";

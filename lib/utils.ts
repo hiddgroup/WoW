@@ -275,6 +275,8 @@ export function applyScheduleSync(
   today: Date = todayAtMidnight()
 ): Project {
   if (project.archived) return project;
+  // 보류 is set by a person; don't flip it to 지연 or 진행 중 automatically.
+  if (project.status === "on_hold") return project;
 
   const day = today.getTime();
   const milestones = normalizeProjectMilestones(project).milestones.map((m) => {

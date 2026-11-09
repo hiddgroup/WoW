@@ -238,6 +238,8 @@ export function useProjectHub() {
     const kanbanNextWeek: KanbanItem[] = [];
 
     active.forEach((proj) => {
+      // Projects on hold drop off the to-do board until they're resumed.
+      if (proj.status === "on_hold") return;
       proj.milestones.forEach((m, idx) => {
         const item: KanbanItem = {
           ...m,

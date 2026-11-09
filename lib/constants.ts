@@ -6,6 +6,7 @@ export const STATUS: Record<ProjectStatus, StatusConfig> = {
   at_risk: { label: "위험", color: "#B91C1C", bg: "#FEE2E2" },
   completed: { label: "완료", color: "#14532D", bg: "#BBF7D0" },
   delayed: { label: "지연", color: "#92400E", bg: "#FEF3C7" },
+  on_hold: { label: "보류", color: "#475569", bg: "#E2E8F0" },
 };
 
 export const COLORS = [
