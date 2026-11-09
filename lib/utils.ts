@@ -1,5 +1,5 @@
 import { COLORS } from "./constants";
-import type { AuthUser, Milestone, Project, ProjectMember } from "./types";
+import type { AuthUser, Milestone, Project, ProjectMember, ProjectStatus } from "./types";
 
 export function memberColor(userId: string): string {
   let hash = 0;
@@ -270,44 +270,41 @@ export function scheduleNeedsPersist(before: Project, after: Project): boolean {
 }
 
 /** 일정 경과 시 지연만 반영합니다. 완료·아카이브는 사용자가 직접 처리할 때만 바뀝니다. */
+const MANUAL_STATUSES = new Set<ProjectStatus>(["at_risk", "completed", "on_hold"]);
+
 export function applyScheduleSync(
   project: Project,
   today: Date = todayAtMidnight()
 ): Project {
   if (project.archived) return project;
-  // 보류 is set by a person; don't flip it to 지연 or 진행 중 automatically.
-  if (project.status === "on_hold") return project;
 
-  const day = today.getTime();
   const milestones = normalizeProjectMilestones(project).milestones.map((m) => {
     if (m.done && !m.completedAt) return { ...m, done: false };
     return m;
   });
 
-  const start = parseDateDay(project.start);
-  const started = start.getTime() <= day;
+  // 위험, 완료 and 보류 are chosen by a person, so they always stick.
+  // Only 시작 전 / 진행 중 / 지연 follow the schedule automatically.
+  if (MANUAL_STATUSES.has(project.status)) {
+    return { ...project, milestones };
+  }
+
+  const day = today.getTime();
+  const started = parseDateDay(project.start).getTime() <= day;
+  // A task finished late no longer keeps the project in 지연 forever;
+  // only work that is still open and past its date does.
   const hasOpenOverdue = milestones.some(
     (m) => milestoneTiming(m, today) === "delayed"
   );
-  const hasLateCompletion = milestones.some(
-    (m) => milestoneTiming(m, today) === "done_late"
-  );
-  const projectPastEnd =
-    !!project.end && parseDateDay(project.end).getTime() < day;
   const allUserDone =
     milestones.length > 0 && milestones.every((m) => !!m.completedAt);
-  const projectPastAndOpen = projectPastEnd && !allUserDone;
-  const stillLate = hasOpenOverdue || hasLateCompletion || projectPastAndOpen;
-  const userClosed = project.status === "completed" && allUserDone;
+  const projectPastAndOpen =
+    !!project.end && parseDateDay(project.end).getTime() < day && !allUserDone;
+  const stillLate = hasOpenOverdue || projectPastAndOpen;
 
-  let status = project.status;
-  if (stillLate && !userClosed) {
-    status = "delayed";
-  } else if (!stillLate && status === "delayed") {
-    status = started ? "in_progress" : "not_started";
-  } else if (!stillLate && started && status === "not_started") {
-    status = "in_progress";
-  }
+  let status: ProjectStatus;
+  if (stillLate) status = "delayed";
+  else status = started ? "in_progress" : "not_started";
 
   return { ...project, milestones, status, archived: project.archived };
 }
